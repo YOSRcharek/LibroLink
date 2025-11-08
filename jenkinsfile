@@ -1,0 +1,106 @@
+pipeline {
+    agent any
+
+    environment {
+        APP_ENV = "local"
+        APP_DEBUG = "true"
+        APP_KEY = ""
+        DB_CONNECTION = "mysql"
+        DB_HOST = "127.0.0.1"
+        DB_PORT = "3306"
+        DB_DATABASE = "bookshare"
+       DB_USERNAME="laravel"
+DB_PASSWORD="secret123"
+
+        PHP_PATH = "/usr/bin/php"
+        COMPOSER_PATH = "/usr/local/bin/composer"
+        NODE_PATH = "/usr/bin/npm"
+    }
+
+    stages {
+
+        stage('Checkout') {
+            steps {
+                echo '📦 Checkout du code depuis GitHub...'
+                git branch: 'main', url: 'https://github.com/Abdessalem-Chaouch/Bookshare.git'
+            }
+        }
+
+        stage('Install Dependencies') {
+            steps {
+                echo '📦 Installation des dépendances Laravel...'
+                sh '${COMPOSER_PATH} install --no-interaction --prefer-dist --no-progress'
+                echo '📦 Installation des dépendances NPM...'
+                sh '${NODE_PATH} install'
+            }
+        }
+
+        stage('Setup Environment') {
+            steps {
+                echo '⚙️ Configuration du fichier .env et clé Laravel...'
+                sh '''
+                    if [ ! -f .env ]; then
+                        cp .env.example .env
+                    fi
+                    ${PHP_PATH} artisan key:generate
+                '''
+            }
+        }
+
+        stage('Ensure MySQL is running') {
+            steps {
+                echo '🛡️ Vérification de MySQL...'
+                sh '''
+                    sudo service mysql start || true
+                    until mysqladmin ping -h${DB_HOST} -P${DB_PORT} --silent; do
+                        echo "Attente du démarrage de MySQL..."
+                        sleep 2
+                    done
+                    echo "MySQL est opérationnel"
+                '''
+            }
+        }
+
+        stage('Create Database if not exists') {
+            steps {
+                echo '🗄️ Création de la base de données si nécessaire...'
+                sh '''
+                    mysql -h${DB_HOST} -P${DB_PORT} -u${DB_USERNAME} -p${DB_PASSWORD} -e "CREATE DATABASE IF NOT EXISTS ${DB_DATABASE} CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;"
+                '''
+            }
+        }
+
+        stage('Run Migrations & Storage') {
+            steps {
+                echo '🗄️ Migration de la base de données et configuration du stockage...'
+                sh '''
+                    ${PHP_PATH} artisan migrate --force
+                    ${PHP_PATH} artisan storage:link || true
+                '''
+            }
+        }
+
+        stage('Build Vite') {
+            steps {
+                echo '⚙️ Compilation du projet Laravel avec Vite...'
+                sh '${NODE_PATH} run build'
+            }
+        }
+
+        stage('Run Dev Server') {
+            steps {
+                echo '🚀 Lancement du serveur de développement...'
+                sh 'nohup ${NODE_PATH} run dev >/dev/null 2>&1 &'
+            }
+        }
+    }
+
+    post {
+        success {
+            echo '✅ Pipeline exécutée avec succès ! Application Laravel opérationnelle 🎉'
+        }
+        failure {
+            echo '❌ Échec de la pipeline ! Vérifie les logs Jenkins pour plus de détails.'
+        }
+    }
+}
