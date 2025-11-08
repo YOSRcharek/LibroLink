@@ -1,0 +1,19 @@
+flask
+flask-cors
+gtts
+requests
+PyMuPDF
+PyPDF2
+numpy
+pymysql
+pandas
+python-dotenv
+sentencepiece   
+faiss-cpu
+# 🔽 Pour ton IA (version CPU légère)
+transformers==4.42.3
+sentence-transformers==3.0.1
+torch==2.9.0+cpu
+torchaudio==2.9.0+cpu
+--extra-index-url https://download.pytorch.org/whl/cpu
+
